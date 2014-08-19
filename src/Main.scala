@@ -1,56 +1,44 @@
-package com.taobao.moxing
-
-import java.net.InetSocketAddress
-import mina.core.Equipment.Equipment
-import mina.core.session.IoSession
-
-import scala.actors.Actor
-import actors.Actor, actors.Actor._
-
-object Actor1 extends Actor { // 或者class
-
-  // 实现线程
-
-  def act() {
-    react {
-      case Int => println("number"); exit
-      case _ => println("ok"); exit
-    }
-  }
-
-}
-
+package mina.core
 /**
  * Created by Administrator on 2014/8/16.
  */
 object Main {
+
   def main(args: Array[String]) = {
-    //    val a1 = Actor.actor {
-    //          var work = true
-    //          while(work) {
-    //            receive { // 接受消息, 或者用receiveWith(1000)
-    //              case msg:String => println("a1: " + msg)
-    //              case x:Int => work = false; println("a1 stop: " + x)
-    //            }
-    //      }
-    //    }
-    //    a1 ! "hello" // "a1: hello"
-    //    a1 ! "world" // "a1: world"
-    //    a1 ! -1 // "a1 stop: -1"
+    println("Start")
 
-    val session = new IoSession;
-    val al=Equipment(session);
-    al ! "aaa";
-    println("error")
+    val kernel = MKernel(
+      //新建通讯规约
+      new MProtocol("AFN", "FN") {
+        //处理请求数据帧
+        override def parseRequest(port: MPort): MRequest = {
+          new MRequest("10", Map("AFN" -> 1, "FN" -> 2))
+        }
 
-    //    val acceptor=new NioSocketAcceptor()
-    //    acceptor.getSessionConfig.setReadBufferSize(2048)
-    //    acceptor.getSessionConfig.setIdleTime(IdleStatus.BOTH_IDLE,10)
-    //    acceptor.getFilterChain.addLast("code",new ProtocolCodecFilter(CmccSipcCodecFactory))
-    //    acceptor.setHandler(MyServer)
-    //    acceptor.bind(new InetSocketAddress(9988))
-    //    while(true){
-    //      Thread.sleep(1000)
-    //    }
+        //打包数据
+        override def packResponse(equipment: MEquipment, response: MResponse): Array[Byte] = {
+          Array[Byte](100)
+        }
+      }
+    )
+    //添加解析命令
+    kernel.protocol += new MCommand(Map("AFN" -> 1, "FN" -> 2)) {
+      override def dataArrive(request: MRequest, equipment: MEquipment): MResponse = {
+        println("work")
+        new MResponse(this.command)
+      }
+    }
+
+    //模拟端口建立
+    val port = new MPort(kernel) {
+      override def send(data: Array[Byte]): Unit = {
+        data.foreach(f => print(f + " "))
+        println()
+      }
+    }
+
+    port.dataArrive()
+
+    kernel.sendMessage(new MSysMessage(MSystemMessageType.Continue))
   }
 }
